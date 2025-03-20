@@ -59,6 +59,9 @@ class AuthTokenSerializer(serializers.Serializer):
         required=False,
     )
 
+    class Meta:
+        ref_name = 'UserAuthTokenSerializer'  # 設置不同的ref_name避免與rest_framework.authtoken.serializers.AuthTokenSerializer衝突
+
     def validate(self, attrs):
         """Validate and authenticate the user"""
         email = attrs.get('email')

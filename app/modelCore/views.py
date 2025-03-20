@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, status, permissions, mixins
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from .models import Park, Destination, TicketType, Order, OrderItem, Ticket, Cart, CartItem
 from .database import SyncParkDatabase, ParkDatabase
@@ -11,7 +11,7 @@ from .serializers import (
 )
 from django.conf import settings
 from .services import ThemeParksService
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.db.models import F, Sum, Case, When, Value, CharField, OuterRef, Subquery
@@ -19,6 +19,8 @@ from django.db.models import Count, Avg, Min, Max
 from django.db import transaction
 import uuid
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 # Create API configuration
 API_CONFIG = {
@@ -176,31 +178,31 @@ class DestinationViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
 def current_user(request):
     """
-    Get information of the currently logged in user
+    Get information of the current logged in user
     """
-    data = {
-        'id': request.user.id,
-        'email': request.user.email,
-        'name': request.user.name,
-        'is_staff': request.user.is_staff,
-        'is_authenticated': True,
-    }
-    return Response(data)
+    user = request.user
+    return Response({
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'is_staff': user.is_staff
+    })
 
 # Ticket and order related viewsets
 class TicketTypeViewSet(viewsets.ModelViewSet):
-    """售票類型視圖集"""
+    """Ticket Type Viewset"""
     queryset = TicketType.objects.all()
     serializer_class = TicketTypeSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     
     def get_permissions(self):
         """
-        根據操作類型設置權限：
-        - 列表和詳情視圖：允許未認證的訪問
-        - 創建、更新、刪除視圖：需要管理員權限
+        Set permissions based on action type:
+        - List and retrieve views: Allow unauthenticated access
+        - Create, update, delete views: Require admin permissions
         """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.AllowAny]
@@ -227,15 +229,71 @@ class TicketTypeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(park__destination_id=destination_id)
             
         return queryset
+    
+    @swagger_auto_schema(
+        operation_description="Get all ticket types",
+        responses={200: TicketTypeListSerializer(many=True)},
+        manual_parameters=[
+            openapi.Parameter(
+                'park',
+                openapi.IN_QUERY,
+                description="Filter by park ID",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'destination',
+                openapi.IN_QUERY,
+                description="Filter by destination ID",
+                type=openapi.TYPE_STRING,
+                required=False
+            )
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Get details of a specific ticket type",
+        responses={200: TicketTypeSerializer()}
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Create a new ticket type (admin only)",
+        request_body=TicketTypeSerializer,
+        responses={201: TicketTypeSerializer()},
+        security=[{'Token': []}]
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Update a ticket type (admin only)",
+        request_body=TicketTypeSerializer,
+        responses={200: TicketTypeSerializer()},
+        security=[{'Token': []}]
+    )
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Delete a ticket type (admin only)",
+        responses={204: "No Content"},
+        security=[{'Token': []}]
+    )
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
 class OrderViewSet(viewsets.ModelViewSet):
-    """訂單視圖集"""
+    """Order Viewset"""
     serializer_class = OrderSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """限制普通用戶只能查看自己的訂單，管理員可以查看所有訂單"""
+        """Regular users can only view their own orders, admins can view all orders"""
         user = self.request.user
         if user.is_staff:
             return Order.objects.all()
@@ -248,7 +306,37 @@ class OrderViewSet(viewsets.ModelViewSet):
             return OrderDetailSerializer
         return OrderSerializer
     
+    @swagger_auto_schema(
+        operation_description="Get order list (users can only see their own orders)",
+        responses={200: OrderSerializer(many=True)},
+        security=[{'Token': []}]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Get order details",
+        responses={200: OrderDetailSerializer()},
+        security=[{'Token': []}]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Create new order",
+        request_body=OrderCreateSerializer,
+        responses={201: OrderDetailSerializer()},
+        security=[{'Token': []}]
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'])
+    @swagger_auto_schema(
+        operation_description="Cancel an order",
+        responses={200: OrderSerializer()},
+        security=[{'Token': []}]
+    )
     def cancel(self, request, pk=None):
         """Cancel an order"""
         order = self.get_object()
@@ -266,6 +354,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
+    @swagger_auto_schema(
+        operation_description="Pay for an order",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['payment_method'],
+            properties={
+                'payment_method': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Payment method, e.g. 'Credit Card', 'PayPal'"
+                )
+            }
+        ),
+        responses={200: OrderSerializer()},
+        security=[{'Token': []}]
+    )
     def pay(self, request, pk=None):
         """Pay for an order (simulation)"""
         order = self.get_object()
@@ -289,6 +392,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 class TicketViewSet(viewsets.ReadOnlyModelViewSet):
     """Ticket viewset"""
     serializer_class = TicketSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
@@ -301,7 +405,28 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
             'order_item__order'
         ).order_by('-order_item__order__created_at')
     
+    @swagger_auto_schema(
+        operation_description="Get all user tickets",
+        responses={200: TicketSerializer(many=True)},
+        security=[{'Token': []}]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Get ticket details",
+        responses={200: TicketSerializer()},
+        security=[{'Token': []}]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
     @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        operation_description="Get user's valid tickets (paid but not used)",
+        responses={200: TicketSerializer(many=True)},
+        security=[{'Token': []}]
+    )
     def valid_tickets(self, request):
         """Get user's valid tickets (paid but not used)"""
         tickets = self.get_queryset().filter(
@@ -312,6 +437,21 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
+    @swagger_auto_schema(
+        operation_description="Update ticket guest name",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['guest_name'],
+            properties={
+                'guest_name': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Guest name"
+                )
+            }
+        ),
+        responses={200: TicketSerializer()},
+        security=[{'Token': []}]
+    )
     def update_guest(self, request, pk=None):
         """Update the guest name on a ticket"""
         ticket = self.get_object()
@@ -336,123 +476,101 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(ticket)
         return Response(serializer.data)
 
-class CartViewSet(viewsets.GenericViewSet,
-                 mixins.RetrieveModelMixin,
-                 mixins.DestroyModelMixin):
-    """Cart viewset"""
+class CartViewSet(viewsets.ModelViewSet):
+    """Shopping Cart Viewset"""
     serializer_class = CartSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    
     def get_queryset(self):
-        return Cart.objects.filter(user=self.request.user)
-
-    def get_object(self):
-        """Get or create user's cart"""
-        cart, _ = Cart.objects.get_or_create(user=self.request.user)
-        return cart
-
+        """Users can only view their own carts"""
+        user = self.request.user
+        return Cart.objects.filter(user=user)
+    
+    def perform_create(self, serializer):
+        """Ensure cart is associated with the current user"""
+        serializer.save(user=self.request.user)
+    
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         """Add item to cart"""
         cart = self.get_object()
-        serializer = CartItemSerializer(data=request.data)
-        if serializer.is_valid():
-            ticket_type = serializer.validated_data['ticket_type']
-            quantity = serializer.validated_data.get('quantity', 1)
+        
+        try:
+            ticket_type_id = request.data.get('ticket_type')
+            if not ticket_type_id:
+                return Response({"detail": "Ticket type ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            ticket_type = TicketType.objects.get(id=ticket_type_id)
+            quantity = int(request.data.get('quantity', 1))
             
-            # Check if same ticket type already exists
+            # Check if item already exists in cart
             cart_item, created = CartItem.objects.get_or_create(
                 cart=cart,
                 ticket_type=ticket_type,
                 defaults={'quantity': quantity}
             )
             
-            # If exists, update quantity
+            # If item exists, increase quantity
             if not created:
                 cart_item.quantity += quantity
                 cart_item.save()
+                
+            return Response(CartSerializer(cart).data)
             
-            return Response(CartItemSerializer(cart_item).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['post'])
-    def update_item(self, request, pk=None):
-        """Update item quantity in cart"""
-        cart = self.get_object()
-        try:
-            cart_item = cart.items.get(id=request.data.get('item_id'))
-        except CartItem.DoesNotExist:
-            return Response({'detail': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        serializer = CartItemSerializer(cart_item, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        except TicketType.DoesNotExist:
+            return Response({"detail": "Specified ticket type does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(detail=True, methods=['post'])
     def remove_item(self, request, pk=None):
         """Remove item from cart"""
         cart = self.get_object()
+        
         try:
-            cart_item = cart.items.get(id=request.data.get('item_id'))
-            cart_item.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            item_id = request.data.get('item_id')
+            if not item_id:
+                return Response({"detail": "Cart item ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            item = CartItem.objects.get(id=item_id, cart=cart)
+            item.delete()
+                
+            return Response(CartSerializer(cart).data)
+            
         except CartItem.DoesNotExist:
-            return Response({'detail': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
-
+            return Response({"detail": "Specified cart item does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def update_quantity(self, request, pk=None):
+        """Update cart item quantity"""
+        cart = self.get_object()
+        
+        try:
+            item_id = request.data.get('item_id')
+            quantity = int(request.data.get('quantity', 1))
+            
+            if not item_id:
+                return Response({"detail": "Cart item ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+            if quantity < 1:
+                return Response({"detail": "Quantity must be greater than 0"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            item = CartItem.objects.get(id=item_id, cart=cart)
+            item.quantity = quantity
+            item.save()
+                
+            return Response(CartSerializer(cart).data)
+            
+        except CartItem.DoesNotExist:
+            return Response({"detail": "Specified cart item does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(detail=True, methods=['post'])
     def clear(self, request, pk=None):
         """Clear the cart"""
         cart = self.get_object()
         cart.items.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=True, methods=['post'])
-    def checkout(self, request, pk=None):
-        """Checkout and create order"""
-        cart = self.get_object()
-        if not cart.items.exists():
-            return Response(
-                {'detail': 'Cart is empty'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            with transaction.atomic():
-                # Create order
-                order = Order.objects.create(
-                    user=request.user,
-                    total_price=cart.get_total_price(),
-                    status=Order.PENDING
-                )
-
-                # Create order items
-                for cart_item in cart.items.all():
-                    order_item = OrderItem.objects.create(
-                        order=order,
-                        ticket_type=cart_item.ticket_type,
-                        quantity=cart_item.quantity,
-                        unit_price=cart_item.ticket_type.price
-                    )
-                    
-                    # Create tickets for each order item
-                    for _ in range(cart_item.quantity):
-                        Ticket.objects.create(
-                            order_item=order_item,
-                            ticket_code=uuid.uuid4()
-                        )
-
-                # Clear the cart
-                cart.items.all().delete()
-
-                return Response(
-                    OrderSerializer(order).data,
-                    status=status.HTTP_201_CREATED
-                )
-
-        except Exception as e:
-            return Response(
-                {'detail': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        return Response(CartSerializer(cart).data)

@@ -26,27 +26,48 @@ from django.db.models import Q
 
 # 添加UserViewSet
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
-    """用戶視圖集，只提供讀取功能"""
+    """User Viewset, read-only functionality"""
     queryset = User.objects.all()
     serializer_class = GetUserSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """限制只有管理員可以查看所有用戶，普通用戶只能查看自己"""
+        """Only admins can see all users, regular users can only see themselves"""
         if self.request.user.is_staff:
             return User.objects.all()
         return User.objects.filter(id=self.request.user.id)
     
+    @swagger_auto_schema(
+        operation_description="Get user list (regular users can only see themselves, admins can see all users)",
+        responses={200: GetUserSerializer(many=True)},
+        security=[{'Token': []}]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    @swagger_auto_schema(
+        operation_description="Get user details",
+        responses={200: GetUserSerializer()},
+        security=[{'Token': []}]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+    
     @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        operation_description="Get current user's details",
+        responses={200: GetUserSerializer()},
+        security=[{'Token': []}]
+    )
     def me(self, request):
-        """獲取當前用戶的詳細信息"""
+        """Get current user's details"""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
     
     @swagger_auto_schema(
         method='post',
-        operation_description="更新密碼",
+        operation_description="Update password",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=['old_password', 'new_password'],
@@ -57,7 +78,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         ),
         responses={
             200: openapi.Response(
-                description="密碼更新成功",
+                description="Password updated successfully",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -65,45 +86,46 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                     }
                 )
             ),
-            400: "密碼更新失敗",
-        }
+            400: "Password update failed",
+        },
+        security=[{'Token': []}]
     )
     @action(detail=False, methods=['post'])
     def change_password(self, request):
-        """更新密碼"""
+        """Update password"""
         user = request.user
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
         
         if not old_password or not new_password:
-            return Response({'detail': '必須提供舊密碼和新密碼'}, status=400)
+            return Response({'detail': 'Both old and new passwords are required'}, status=400)
         
         if not user.check_password(old_password):
-            return Response({'detail': '舊密碼不正確'}, status=400)
+            return Response({'detail': 'Old password is incorrect'}, status=400)
         
         user.set_password(new_password)
         user.save()
         
-        # 重新生成 token
+        # Regenerate token
         Token.objects.filter(user=user).delete()
         token, _ = Token.objects.get_or_create(user=user)
         
         return Response({
-            'message': '密碼更新成功',
+            'message': 'Password updated successfully',
             'token': token.key
         })
 
 class RegisterView(APIView):
-    """使用者註冊"""
+    """User Registration"""
     serializer_class = RegisterSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         request_body=RegisterSerializer,
-        operation_description="使用者註冊",
+        operation_description="User registration",
         responses={
             201: openapi.Response(
-                description="註冊成功",
+                description="Registration successful",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -119,7 +141,7 @@ class RegisterView(APIView):
                     }
                 )
             ),
-            400: "註冊失敗"
+            400: "Registration failed"
         }
     )
     def post(self, request):
@@ -132,18 +154,18 @@ class RegisterView(APIView):
             'user': {
                 'id': user.id,
                 'email': user.email,
-                'name': user.name if user.name else user.email.split('@')[0]  # 如果未設置名稱則使用郵箱名
+                'name': user.name if user.name else user.email.split('@')[0]  # Use email name if name not set
             }
         }, status=201)
 
 class CreateUserView(generics.CreateAPIView):
-    """管理員創建新用戶"""
+    """Admin creates a new user"""
     serializer_class = UserSerializer
     authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAdminUser,)
 
     @swagger_auto_schema(
-        operation_description="管理員創建新用戶（需要管理員權限）",
+        operation_description="Admin creates a new user (admin privileges required)",
         responses={
             201: UserSerializer()
         }
@@ -266,16 +288,16 @@ def qualifications_to_delete_user(user):
             return False
 
 class LoginView(APIView):
-    """使用者登入"""
+    """User Login"""
     serializer_class = LoginSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         request_body=LoginSerializer,
-        operation_description="使用者登入並獲取 Token",
+        operation_description="User login and get Token",
         responses={
             200: openapi.Response(
-                description="登入成功",
+                description="Login successful",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -292,7 +314,7 @@ class LoginView(APIView):
                     }
                 )
             ),
-            400: "認證失敗"
+            400: "Authentication failed"
         }
     )
     def post(self, request):
@@ -313,15 +335,15 @@ class LoginView(APIView):
         })
 
 class LogoutView(APIView):
-    """使用者登出"""
+    """User Logout"""
     authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
 
     @swagger_auto_schema(
-        operation_description="使用者登出並刪除 Token",
+        operation_description="User logout and delete Token",
         responses={
             200: openapi.Response(
-                description="登出成功",
+                description="Logout successful",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -332,21 +354,21 @@ class LogoutView(APIView):
         }
     )
     def post(self, request):
-        # 刪除用戶的 token
+        # Delete user's token
         request.user.auth_token.delete()
-        return Response({'message': '成功登出'})
+        return Response({'message': 'Successfully logged out'})
 
 class RefreshTokenView(APIView):
-    """刷新用戶的令牌"""
+    """Refresh user's token"""
     serializer_class = RefreshTokenSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         request_body=RefreshTokenSerializer,
-        operation_description="刷新用戶的令牌",
+        operation_description="Refresh user's token",
         responses={
             200: openapi.Response(
-                description="令牌刷新成功",
+                description="Token refresh successful",
                 schema=openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
@@ -354,7 +376,7 @@ class RefreshTokenView(APIView):
                     }
                 )
             ),
-            400: "令牌無效"
+            400: "Invalid token"
         }
     )
     def post(self, request):
@@ -366,14 +388,14 @@ class RefreshTokenView(APIView):
             old_token = Token.objects.get(key=old_token_key)
             user = old_token.user
             
-            # 刪除舊令牌
+            # Delete old token
             old_token.delete()
             
-            # 創建新令牌
+            # Create new token
             new_token, _ = Token.objects.get_or_create(user=user)
             
             return Response({
                 'token': new_token.key
             })
         except Token.DoesNotExist:
-            return Response({"detail": "令牌無效"}, status=400)
+            return Response({"detail": "Invalid token"}, status=400)

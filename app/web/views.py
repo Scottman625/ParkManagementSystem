@@ -28,20 +28,23 @@ def index(request):
     return render(request, 'web/index.html', context)
 
 class DestinationViewSet(viewsets.ModelViewSet):
-    """目的地視圖集"""
+    """Destination Viewset"""
     queryset = Destination.objects.all()
     serializer_class = DestinationSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
-
+    
     def get_permissions(self):
         """
-        列表和詳情視圖：允許未認證的訪問
-        創建、更新、刪除視圖：需要管理員權限
+        Set permissions based on action type:
+        - List and retrieve views: Allow unauthenticated access
+        - Create, update, delete views: Require admin permissions
         """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.AllowAny]
         else:
             permission_classes = [permissions.IsAdminUser]
+        
+        # Create permission class instances
         return [permission() for permission in permission_classes]
 
     @swagger_auto_schema(
@@ -59,15 +62,16 @@ class DestinationViewSet(viewsets.ModelViewSet):
         return super().retrieve(request, *args, **kwargs)
 
 class ParkViewSet(viewsets.ModelViewSet):
-    """主題樂園視圖集"""
+    """Theme Park Viewset"""
     queryset = Park.objects.all()
     serializer_class = ParkSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
 
     def get_permissions(self):
         """
-        列表和詳情視圖：允許未認證的訪問
-        創建、更新、刪除視圖：需要管理員權限
+        Set permissions based on action type:
+        - List and retrieve views: Allow unauthenticated access
+        - Create, update, delete views: Require admin permissions
         """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.AllowAny]
@@ -101,15 +105,16 @@ class ParkViewSet(viewsets.ModelViewSet):
         return super().retrieve(request, *args, **kwargs)
 
 class AttractionViewSet(viewsets.ModelViewSet):
-    """景點視圖集"""
+    """Attraction Viewset"""
     queryset = Attraction.objects.all()
     serializer_class = AttractionSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
 
     def get_permissions(self):
         """
-        列表和詳情視圖：允許未認證的訪問
-        創建、更新、刪除視圖：需要管理員權限
+        Set permissions based on action type:
+        - List and retrieve views: Allow unauthenticated access
+        - Create, update, delete views: Require admin permissions
         """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.AllowAny]
@@ -186,21 +191,21 @@ class AttractionViewSet(viewsets.ModelViewSet):
 
 
 class GuestReviewViewSet(viewsets.ModelViewSet):
-    """訪客評論視圖集"""
+    """Guest Review Viewset"""
     queryset = GuestReview.objects.all()
     serializer_class = GuestReviewSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """限制普通用戶只能查看自己的評論，管理員可以查看所有評論"""
+        """Regular users can only view their own reviews, admins can view all reviews"""
         user = self.request.user
         if user.is_staff:
             return GuestReview.objects.all()
         return GuestReview.objects.filter(user=user)
 
     def perform_create(self, serializer):
-        """確保評論與當前用戶關聯"""
+        """Ensure review is associated with the current user"""
         serializer.save(user=self.request.user)
     
     @swagger_auto_schema(
