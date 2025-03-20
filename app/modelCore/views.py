@@ -18,6 +18,7 @@ from django.db.models import F, Sum, Case, When, Value, CharField, OuterRef, Sub
 from django.db.models import Count, Avg, Min, Max
 from django.db import transaction
 import uuid
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 # Create API configuration
 API_CONFIG = {
@@ -189,11 +190,23 @@ def current_user(request):
     return Response(data)
 
 # Ticket and order related viewsets
-class TicketTypeViewSet(viewsets.ReadOnlyModelViewSet):
-    """Ticket type viewset"""
-    queryset = TicketType.objects.filter(is_active=True)
+class TicketTypeViewSet(viewsets.ModelViewSet):
+    """售票類型視圖集"""
+    queryset = TicketType.objects.all()
     serializer_class = TicketTypeSerializer
-    permission_classes = [permissions.AllowAny]
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    
+    def get_permissions(self):
+        """
+        根據操作類型設置權限：
+        - 列表和詳情視圖：允許未認證的訪問
+        - 創建、更新、刪除視圖：需要管理員權限
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAdminUser]
+        return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -216,14 +229,17 @@ class TicketTypeViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 class OrderViewSet(viewsets.ModelViewSet):
-    """Order viewset"""
+    """訂單視圖集"""
     serializer_class = OrderSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Users can only view their own orders"""
+        """限制普通用戶只能查看自己的訂單，管理員可以查看所有訂單"""
         user = self.request.user
-        return Order.objects.filter(user=user).order_by('-created_at')
+        if user.is_staff:
+            return Order.objects.all()
+        return Order.objects.filter(user=user)
     
     def get_serializer_class(self):
         if self.action == 'create':

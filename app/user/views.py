@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.permissions import AllowAny
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 from user.serializers import (
     UserSerializer, 
@@ -18,7 +19,8 @@ from user.serializers import (
     UpdateUserSerializer, 
     GetUserSerializer,
     LoginSerializer,
-    RegisterSerializer
+    RegisterSerializer,
+    RefreshTokenSerializer
 )
 from django.db.models import Q
 
@@ -27,6 +29,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """用戶視圖集，只提供讀取功能"""
     queryset = User.objects.all()
     serializer_class = GetUserSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
@@ -109,12 +112,14 @@ class RegisterView(APIView):
                             type=openapi.TYPE_OBJECT,
                             properties={
                                 'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
                                 'name': openapi.Schema(type=openapi.TYPE_STRING),
                             }
                         )
                     }
                 )
-            )
+            ),
+            400: "註冊失敗"
         }
     )
     def post(self, request):
@@ -126,14 +131,15 @@ class RegisterView(APIView):
             'token': token.key,
             'user': {
                 'id': user.id,
-                'name': user.name
+                'email': user.email,
+                'name': user.name if user.name else user.email.split('@')[0]  # 如果未設置名稱則使用郵箱名
             }
         }, status=201)
 
 class CreateUserView(generics.CreateAPIView):
     """管理員創建新用戶"""
     serializer_class = UserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAdminUser,)
 
     @swagger_auto_schema(
@@ -156,7 +162,7 @@ class CreateTokenView(ObtainAuthToken):
 class ManageUserView(generics.RetrieveUpdateAPIView):
     """Manage the authenticated user"""
     serializer_class = UpdateUserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_object(self):
@@ -169,7 +175,8 @@ class ManageUserView(generics.RetrieveUpdateAPIView):
         return user
 
 class UpdateUserLineIdView(APIView):
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def put(self, request, format=None):
         try:
@@ -183,7 +190,8 @@ class UpdateUserLineIdView(APIView):
             raise APIException("wrong token or null line_id")
 
 class UpdateUserPassword(APIView):
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def put(self, request, format=None):
         user = self.request.user
@@ -199,7 +207,7 @@ class UpdateUserPassword(APIView):
 
 
 class UpdateUserImage(APIView):
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
 
     def put(self, request, format=None):
@@ -212,7 +220,7 @@ class UpdateUserImage(APIView):
         return Response(serializer.data)
 
 class GetUpdateUserFCMNotify(APIView):
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, format=None):
@@ -230,7 +238,7 @@ class GetUpdateUserFCMNotify(APIView):
         return Response({'message':'ok'})
 
 class DeleteUser(generics.DestroyAPIView):
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = UserSerializer
     queryset = User.objects.all()
@@ -247,6 +255,7 @@ class DeleteUser(generics.DestroyAPIView):
                 return Response('delete user')
         else:
             return Response('not auth')
+
 
 def qualifications_to_delete_user(user):
     for order in user.user_orders.all():
@@ -271,10 +280,19 @@ class LoginView(APIView):
                     type=openapi.TYPE_OBJECT,
                     properties={
                         'token': openapi.Schema(type=openapi.TYPE_STRING),
-                        'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'user': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                                'name': openapi.Schema(type=openapi.TYPE_STRING),
+                                'is_admin': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            }
+                        )
                     }
                 )
-            )
+            ),
+            400: "認證失敗"
         }
     )
     def post(self, request):
@@ -286,12 +304,17 @@ class LoginView(APIView):
         
         return Response({
             'token': token.key,
-            'user_id': user.id
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'is_admin': user.is_staff
+            }
         })
 
 class LogoutView(APIView):
     """使用者登出"""
-    authentication_classes = (authentication.TokenAuthentication,)
+    authentication_classes = (TokenAuthentication, SessionAuthentication)
     permission_classes = (permissions.IsAuthenticated,)
 
     @swagger_auto_schema(
@@ -312,3 +335,45 @@ class LogoutView(APIView):
         # 刪除用戶的 token
         request.user.auth_token.delete()
         return Response({'message': '成功登出'})
+
+class RefreshTokenView(APIView):
+    """刷新用戶的令牌"""
+    serializer_class = RefreshTokenSerializer
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        request_body=RefreshTokenSerializer,
+        operation_description="刷新用戶的令牌",
+        responses={
+            200: openapi.Response(
+                description="令牌刷新成功",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'token': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: "令牌無效"
+        }
+    )
+    def post(self, request):
+        serializer = RefreshTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        old_token_key = serializer.validated_data['token']
+        try:
+            old_token = Token.objects.get(key=old_token_key)
+            user = old_token.user
+            
+            # 刪除舊令牌
+            old_token.delete()
+            
+            # 創建新令牌
+            new_token, _ = Token.objects.get_or_create(user=user)
+            
+            return Response({
+                'token': new_token.key
+            })
+        except Token.DoesNotExist:
+            return Response({"detail": "令牌無效"}, status=400)

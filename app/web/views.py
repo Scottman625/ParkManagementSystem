@@ -13,6 +13,7 @@ from .serializers import (
     AttractionReviewsSerializer
 )
 from django.db import models
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 # Create your views here.
 
@@ -26,18 +27,22 @@ def index(request):
     }
     return render(request, 'web/index.html', context)
 
-class DestinationViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoints for destinations
-    
-    list:
-    Get a list of all destinations
-    
-    retrieve:
-    Get detailed information for a specific destination
-    """
+class DestinationViewSet(viewsets.ModelViewSet):
+    """目的地視圖集"""
     queryset = Destination.objects.all()
     serializer_class = DestinationSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+
+    def get_permissions(self):
+        """
+        列表和詳情視圖：允許未認證的訪問
+        創建、更新、刪除視圖：需要管理員權限
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     @swagger_auto_schema(
         operation_description="Get a list of all destinations",
@@ -53,18 +58,22 @@ class DestinationViewSet(viewsets.ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
-class ParkViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoints for parks
-    
-    list:
-    Get a list of all parks
-    
-    retrieve:
-    Get detailed information for a specific park
-    """
+class ParkViewSet(viewsets.ModelViewSet):
+    """主題樂園視圖集"""
     queryset = Park.objects.all()
     serializer_class = ParkSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+
+    def get_permissions(self):
+        """
+        列表和詳情視圖：允許未認證的訪問
+        創建、更新、刪除視圖：需要管理員權限
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     @swagger_auto_schema(
         operation_description="Get a list of all parks",
@@ -91,19 +100,22 @@ class ParkViewSet(viewsets.ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
-class AttractionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoints for attractions
-    
-    list:
-    Get a list of all attractions
-    
-    retrieve:
-    Get detailed information for a specific attraction
-    """
-    queryset = Attraction.objects.all().select_related('park', 'park__destination')
+class AttractionViewSet(viewsets.ModelViewSet):
+    """景點視圖集"""
+    queryset = Attraction.objects.all()
     serializer_class = AttractionSerializer
-    pagination_class = pagination.PageNumberPagination
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+
+    def get_permissions(self):
+        """
+        列表和詳情視圖：允許未認證的訪問
+        創建、更新、刪除視圖：需要管理員權限
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAdminUser]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """Optimize queries to reduce database load"""
@@ -174,62 +186,21 @@ class AttractionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class GuestReviewViewSet(viewsets.ModelViewSet):
-    """
-    API endpoints for guest reviews
-    
-    list:
-    Get a list of all reviews
-    
-    create:
-    Create a new review
-    
-    retrieve:
-    Get detailed information for a specific review
-    
-    update:
-    Update a specific review
-    
-    partial_update:
-    Partially update a specific review
-    
-    destroy:
-    Delete a specific review
-    
-    Note: All APIs require user authentication, which can be achieved through:
-    1. Login via the admin page to use Session authentication
-    2. Click the Authorize button in the top right corner of Swagger UI for authentication
-    """
+    """訪客評論視圖集"""
     queryset = GuestReview.objects.all()
+    serializer_class = GuestReviewSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    
-    def get_serializer_class(self):
-        """Choose different serializer based on request type"""
-        if self.action == 'create':
-            return GuestReviewCreateSerializer
-        return GuestReviewSerializer
-    
+
     def get_queryset(self):
-        """Get reviews list based on user"""
-        # Check if this is a swagger fake view for documentation generation
-        if getattr(self, 'swagger_fake_view', False):
-            # Return empty queryset to avoid errors during documentation generation
-            return GuestReview.objects.none()
-            
+        """限制普通用戶只能查看自己的評論，管理員可以查看所有評論"""
         user = self.request.user
-        # Check if user is authenticated
-        if not user.is_authenticated:
-            return GuestReview.objects.filter(is_published=True)
-            
         if user.is_staff:
-            # Admins can see all reviews
             return GuestReview.objects.all()
-        # Regular users can only see their own reviews and published reviews
-        return GuestReview.objects.filter(
-            models.Q(user=user) | models.Q(is_published=True)
-        )
-    
+        return GuestReview.objects.filter(user=user)
+
     def perform_create(self, serializer):
-        """Automatically associate review with current user"""
+        """確保評論與當前用戶關聯"""
         serializer.save(user=self.request.user)
     
     @swagger_auto_schema(

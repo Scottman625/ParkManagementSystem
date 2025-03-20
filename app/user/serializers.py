@@ -158,3 +158,18 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # 創建用戶
         return User.objects.create_user(**validated_data)
+
+class RefreshTokenSerializer(serializers.Serializer):
+    """令牌刷新序列化器"""
+    token = serializers.CharField()
+
+    def validate_token(self, value):
+        from rest_framework.authtoken.models import Token
+        
+        try:
+            # 驗證令牌是否存在
+            token = Token.objects.get(key=value)
+            return value
+        except Token.DoesNotExist:
+            raise serializers.ValidationError("提供的令牌無效")
+
