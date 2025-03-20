@@ -30,6 +30,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'park.stockfunction.cloud',
     'www.park.stockfunction.cloud',
+    'localhost',
 ]
 
 # CSRF configuration
@@ -38,6 +39,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://www.park.stockfunction.cloud',
     'http://park.stockfunction.cloud',
     'http://www.park.stockfunction.cloud',
+    'http://localhost',
 ]
 
 # CORS settings
@@ -169,8 +171,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+        # 'rest_framework.authentication.BasicAuthentication',
     ],
+
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
