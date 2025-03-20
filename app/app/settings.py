@@ -203,13 +203,27 @@ SWAGGER_SETTINGS = {
     'DOC_EXPANSION': 'list',
     'DEEP_LINKING': True,
     'DISPLAY_OPERATION_ID': False,
+    'VALIDATOR_URL': None,  # Disable validator
     'PERSIST_AUTH': True,
     'MAX_DISPLAYED_ENUM_VALUES': 3,
     'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
     'DEFAULT_PAGINATOR_INSPECTORS': [
         'drf_yasg.inspectors.CoreAPICompatInspector',
     ],
+    'OPERATIONS_SORTER': 'alpha',
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'FETCH_SCHEMA_WITH_QUERY': True,
 }
+
+# 修正默認服務器設置
+SWAGGER_SETTINGS['DEFAULT_INFO'] = 'app.urls.swagger_info'
+SWAGGER_SETTINGS['SUPPORTED_SUBMIT_METHODS'] = [
+    'get',
+    'post',
+    'put',
+    'delete',
+    'patch',
+]
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # 默认后端
@@ -218,18 +232,24 @@ AUTHENTICATION_BACKENDS = [
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    "root": {"level": "INFO", "handlers": ["file"]},
+    "root": {"level": "INFO", "handlers": ["console", "file"]},
     "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "app",
+        },
         "file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": BASE_DIR / "django.log",
+            "filename": "/tmp/django_park.log",
             "formatter": "app",
+            "delay": True,  # Delay file opening until first record is logged
         },
     },
     "loggers": {
         "django": {
-            "handlers": ["file"],
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": True
         },

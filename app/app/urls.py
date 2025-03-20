@@ -37,19 +37,26 @@ router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'tickets', TicketViewSet, basename='ticket')
 router.register(r'cart', CartViewSet, basename='cart')
 
+# Swagger info definition
+swagger_info = openapi.Info(
+    title="Theme Park Management System API",
+    default_version='v1',
+    description="API documentation for the Theme Park Management System, including all module endpoints",
+    terms_of_service="https://www.google.com/policies/terms/",
+    contact=openapi.Contact(email="contact@example.com"),
+    license=openapi.License(name="BSD License"),
+)
+
 # Swagger documentation setup
 schema_view = get_schema_view(
-    openapi.Info(
-        title="Theme Park Management System API",
-        default_version='v1',
-        description="API documentation for the Theme Park Management System, including all module endpoints",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@example.com"),
-        license=openapi.License(name="BSD License"),
-    ),
+    swagger_info,
     public=True,
     permission_classes=[permissions.AllowAny],
-    url='https://park.stockfunction.cloud',
+    patterns=[
+        path('api/', include(router.urls)),
+        path('api/user/', include('user.urls')),
+        path('api/modelCore/', include('modelCore.urls')),
+    ],
 )
 
 urlpatterns = [
