@@ -25,7 +25,12 @@ SECRET_KEY = "django-insecure-uc&n%-(#z0jex+=#81f%u^-@%2+00d)=&_8%d8v8d86jtsg@2a
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '*',
+    '127.0.0.1',
+    'park.stockfunction.cloud',
+    'www.park.stockfunction.cloud',
+]
 
 
 # Application definition
