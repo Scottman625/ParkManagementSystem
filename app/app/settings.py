@@ -167,13 +167,14 @@ PARK_API_KEY = ''  # 如果需要 API 密鑰，請在此處設置
 # REST Framework 設置
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_yasg.schema.SchemaGenerator',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20
 }
@@ -184,28 +185,29 @@ SWAGGER_SETTINGS = {
         'Basic': {
             'type': 'basic'
         },
+        'Token': {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'Authorization',
+            'description': '請輸入: Token <你的令牌>'
+        },
         'Session': {
             'type': 'apiKey',
             'in': 'header',
-            'name': 'X-CSRFToken'
-        },
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
+            'name': 'X-CSRFToken',
+            'description': '用於基於會話的身份驗證'
         }
     },
-    'LOGIN_URL': '/admin/login/',
-    'LOGOUT_URL': '/admin/logout/',
+    'LOGIN_URL': '/api-auth/login/',
+    'LOGOUT_URL': '/api-auth/logout/',
     'USE_SESSION_AUTH': True,
     'DEFAULT_MODEL_RENDERING': 'example',
-    'DEFAULT_INFO': None,
     'DOC_EXPANSION': 'list',
     'DEEP_LINKING': True,
     'DISPLAY_OPERATION_ID': False,
     'VALIDATOR_URL': None,  # Disable validator
     'PERSIST_AUTH': True,
-    'MAX_DISPLAYED_ENUM_VALUES': 3,
+    'SHOW_EXTENSIONS': True,
     'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
     'DEFAULT_PAGINATOR_INSPECTORS': [
         'drf_yasg.inspectors.CoreAPICompatInspector',
@@ -213,17 +215,15 @@ SWAGGER_SETTINGS = {
     'OPERATIONS_SORTER': 'alpha',
     'REFETCH_SCHEMA_WITH_AUTH': True,
     'FETCH_SCHEMA_WITH_QUERY': True,
+    'DEFAULT_INFO': 'app.urls.swagger_info',
+    'SUPPORTED_SUBMIT_METHODS': [
+        'get',
+        'post',
+        'put',
+        'delete',
+        'patch',
+    ],
 }
-
-# 修正默認服務器設置
-SWAGGER_SETTINGS['DEFAULT_INFO'] = 'app.urls.swagger_info'
-SWAGGER_SETTINGS['SUPPORTED_SUBMIT_METHODS'] = [
-    'get',
-    'post',
-    'put',
-    'delete',
-    'patch',
-]
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # 默认后端

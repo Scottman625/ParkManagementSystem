@@ -24,6 +24,7 @@ from web.views import DestinationViewSet, ParkViewSet, AttractionViewSet, GuestR
 from rest_framework.routers import DefaultRouter
 from modelCore.views import TicketTypeViewSet, OrderViewSet, TicketViewSet, CartViewSet
 from user.views import UserViewSet
+from rest_framework.authtoken.views import obtain_auth_token
 
 # Create API router
 router = DefaultRouter()
@@ -65,6 +66,9 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/user/', include('user.urls')),
     path('api/modelCore/', include('modelCore.urls')),
+    
+    # 令牌認證
+    path('api/auth/token/', obtain_auth_token, name='api_token_auth'),
     
     # Swagger URLs
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
