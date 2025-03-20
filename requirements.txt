@@ -1,0 +1,13 @@
+Django>=4.2.0
+djangorestframework>=3.14.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+django-cors-headers>=4.3.1
+themeparks
+requests>=2.31.0
+pillow>=10.0.0
+drf-yasg>=1.21.7
+coreapi>=2.3.3
+pyyaml>=6.0.1
+uritemplate>=4.1.1
+aiohttp>=3.8.5
