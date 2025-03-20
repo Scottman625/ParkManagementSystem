@@ -32,6 +32,25 @@ ALLOWED_HOSTS = [
     'www.park.stockfunction.cloud',
 ]
 
+# CSRF configuration
+CSRF_TRUSTED_ORIGINS = [
+    'https://park.stockfunction.cloud',
+    'https://www.park.stockfunction.cloud',
+    'http://park.stockfunction.cloud',
+    'http://www.park.stockfunction.cloud',
+]
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Application definition
 
@@ -49,11 +68,13 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "drf_yasg",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # CORS middleware
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -168,6 +189,11 @@ SWAGGER_SETTINGS = {
             'in': 'header',
             'name': 'X-CSRFToken'
         },
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
     },
     'LOGIN_URL': '/admin/login/',
     'LOGOUT_URL': '/admin/logout/',
@@ -175,7 +201,9 @@ SWAGGER_SETTINGS = {
     'DEFAULT_MODEL_RENDERING': 'example',
     'DEFAULT_INFO': None,
     'DOC_EXPANSION': 'list',
-    'DEEP_LINKING': False,
+    'DEEP_LINKING': True,
+    'DISPLAY_OPERATION_ID': False,
+    'PERSIST_AUTH': True,
     'MAX_DISPLAYED_ENUM_VALUES': 3,
     'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
     'DEFAULT_PAGINATOR_INSPECTORS': [
