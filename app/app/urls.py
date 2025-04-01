@@ -20,7 +20,7 @@ from django.urls import path, include, re_path
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
-from web.views import DestinationViewSet, ParkViewSet, AttractionViewSet, GuestReviewViewSet
+from api.views import DestinationViewSet, ParkViewSet, AttractionViewSet, GuestReviewViewSet
 from rest_framework.routers import DefaultRouter
 from modelCore.views import TicketTypeViewSet, OrderViewSet, TicketViewSet, CartViewSet
 from user.views import UserViewSet, CreateTokenView
@@ -61,7 +61,7 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", include("web.urls")),
+    path("", include("api.urls")),
     path('api/', include(router.urls)),
     path('api/user/', include('user.urls')),
     path('api/modelCore/', include('modelCore.urls')),

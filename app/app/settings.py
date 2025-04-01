@@ -64,7 +64,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "modelCore",
-    "web",
+    "api",
     "user",
     "tasks",
     "rest_framework",
@@ -189,31 +189,20 @@ REST_FRAMEWORK = {
 
 # drf-yasg 設置
 SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': True,
+    'VALIDATOR_URL': None,
+    'REFETCH_SCHEMA_WITH_AUTH': True,
     'SECURITY_DEFINITIONS': {
-        'Basic': {
-            'type': 'basic'
-        },
-        'Token': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'Authorization',
-            'description': '請輸入: Token <你的令牌>'
-        },
-        'Session': {
-            'type': 'apiKey',
-            'in': 'header',
-            'name': 'X-CSRFToken',
-            'description': '用於基於會話的身份驗證'
-        }
+        'Basic': {'type': 'basic'},
+        'Bearer': {'type': 'apiKey', 'name': 'Authorization', 'in': 'header'},
+        'Token': {'type': 'apiKey', 'name': 'Authorization', 'in': 'header'}
     },
     'LOGIN_URL': '/api-auth/login/',
     'LOGOUT_URL': '/api-auth/logout/',
-    'USE_SESSION_AUTH': True,
     'DEFAULT_MODEL_RENDERING': 'example',
     'DOC_EXPANSION': 'list',
     'DEEP_LINKING': True,
     'DISPLAY_OPERATION_ID': False,
-    'VALIDATOR_URL': None,  # Disable validator
     'PERSIST_AUTH': True,
     'SHOW_EXTENSIONS': True,
     'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
@@ -221,7 +210,6 @@ SWAGGER_SETTINGS = {
         'drf_yasg.inspectors.CoreAPICompatInspector',
     ],
     'OPERATIONS_SORTER': 'alpha',
-    'REFETCH_SCHEMA_WITH_AUTH': True,
     'FETCH_SCHEMA_WITH_QUERY': True,
     'DEFAULT_INFO': 'app.urls.swagger_info',
     'SUPPORTED_SUBMIT_METHODS': [

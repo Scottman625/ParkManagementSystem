@@ -4,29 +4,29 @@ from .models import Destination, Park, Attraction
 from django.db import transaction
 
 class ThemeParksService:
-    """主題公園 API 服務類"""
+    """Theme Parks API Service Class"""
     
     BASE_URL = "https://api.themeparks.wiki/v1"
 
     @staticmethod
     def create_destination_from_entity(entity):
         """
-        從 API 返回的 entity 數據創建或更新 Destination 實例
+        Create or update a Destination instance from entity data returned by API
         
         Args:
-            entity (dict): API 返回的目的地數據
+            entity (dict): Destination data returned by API
             
         Returns:
-            Destination: 創建或更新的 Destination 實例
+            Destination: Created or updated Destination instance
         """
         from .models import Destination
         
-        # 從 entity 中提取必要的數據
+        # Extract necessary data from entity
         destination_id = entity.get('id')
         if not destination_id:
-            raise ValueError("目的地 ID 不能為空")
+            raise ValueError("Destination ID cannot be empty")
         
-        # 創建或更新 Destination 實例
+        # Create or update Destination instance
         destination, created = Destination.objects.update_or_create(
             id=uuid.UUID(destination_id),
             defaults={
@@ -40,31 +40,31 @@ class ThemeParksService:
     @staticmethod
     def create_park_from_entity(entity, destination=None):
         """
-        從 API 返回的 entity 數據創建或更新 Park 實例
+        Create or update a Park instance from entity data returned by API
         
         Args:
-            entity (dict): API 返回的公園數據
-            destination (Destination, optional): 對應的目的地實例，如果為 None 則從 entity 中獲取
+            entity (dict): Park data returned by API
+            destination (Destination, optional): Corresponding destination instance, if None will be retrieved from entity
             
         Returns:
-            Park: 創建或更新的 Park 實例
+            Park: Created or updated Park instance
         """
         from .models import Park
         
-        # 從 entity 中提取必要的數據
+        # Extract necessary data from entity
         park_id = entity.get('id')
         if not park_id:
-            raise ValueError("公園 ID 不能為空")
+            raise ValueError("Park ID cannot be empty")
         
-        # 如果沒有提供 destination 實例，則嘗試從 entity 中獲取目的地信息
+        # If destination instance is not provided, try to get destination info from entity
         if destination is None and 'destination' in entity:
             destination_data = entity.get('destination')
             destination = ThemeParksService.create_destination_from_entity(destination_data)
         
         if destination is None:
-            raise ValueError("缺少目的地信息")
+            raise ValueError("Missing destination information")
         
-        # 創建或更新 Park 實例
+        # Create or update Park instance
         park, created = Park.objects.update_or_create(
             id=uuid.UUID(park_id),
             defaults={
@@ -78,58 +78,58 @@ class ThemeParksService:
     @staticmethod
     def create_attraction_from_entity(entity, park=None):
         """
-        從 API 返回的 entity 數據創建或更新 Attraction 實例
+        Create or update an Attraction instance from entity data returned by API
         
         Args:
-            entity (dict): API 返回的吸引設施數據
-            park (Park, optional): 對應的公園實例，如果為 None 則從 entity 中獲取
+            entity (dict): Attraction data returned by API
+            park (Park, optional): Corresponding park instance, if None will be retrieved from entity
             
         Returns:
-            Attraction: 創建或更新的 Attraction 實例
+            Attraction: Created or updated Attraction instance
         """
         from .models import Attraction
         
-        # 從 entity 中提取必要的數據
+        # Extract necessary data from entity
         attraction_id = entity.get('id')
         if not attraction_id:
-            raise ValueError("吸引設施 ID 不能為空")
+            raise ValueError("Attraction ID cannot be empty")
         
-        # 如果沒有提供 park 實例，則嘗試從 entity 中獲取公園信息
+        # If park instance is not provided, try to get park info from entity
         if park is None and 'park' in entity:
             park_data = entity.get('park')
             
-            # 檢查公園數據中是否包含目的地信息
+            # Check if park data includes destination information
             if 'destination' not in entity:
-                raise ValueError("缺少目的地信息")
+                raise ValueError("Missing destination information")
             
-            # 先創建或獲取目的地
+            # First create or get destination
             destination_data = entity.get('destination')
             destination = ThemeParksService.create_destination_from_entity(destination_data)
             
-            # 創建或獲取公園
+            # Create or get park
             park = ThemeParksService.create_park_from_entity(park_data, destination)
         
         if park is None:
-            # 嘗試從 parentId 獲取公園
+            # Try to get park from parentId
             parent_id = entity.get('parentId')
             if parent_id:
                 park_data = ThemeParksService.getEntityById(parent_id)
                 if park_data:
-                    # 創建或獲取目的地和公園
+                    # Create or get destination and park
                     destination_data = park_data.get('destination')
                     if destination_data:
                         destination = ThemeParksService.create_destination_from_entity(destination_data)
                         park = ThemeParksService.create_park_from_entity(park_data, destination)
         
         if park is None:
-            raise ValueError("缺少公園信息")
+            raise ValueError("Missing park information")
         
-        # 獲取描述
+        # Get description
         description = ''
         if 'meta' in entity and entity['meta'] and 'description' in entity['meta']:
             description = entity['meta']['description']
         
-        # 獲取位置信息
+        # Get location information
         longitude = None
         latitude = None
         if 'location' in entity:
@@ -137,21 +137,21 @@ class ThemeParksService:
             longitude = location.get('longitude')
             latitude = location.get('latitude')
         
-        # 創建或更新 Attraction 實例
+        # Create or update Attraction instance
         attraction, created = Attraction.objects.update_or_create(
             id=uuid.UUID(attraction_id),
             defaults={
                 'name': entity.get('name', ''),
                 'park': park,
                 'description': description,
-                # 確保字段名稱與API返回的鍵完全匹配
+                # Ensure field names match API keys exactly
                 'timezone': entity.get('timezone'),
                 'entity_type': entity.get('entityType'),
                 'destination_id': uuid.UUID(entity.get('destinationId')) if entity.get('destinationId') else None,
                 'attraction_type': entity.get('attractionType'),
                 'external_id': entity.get('externalId'),
                 'parent_id': uuid.UUID(entity.get('parentId')) if entity.get('parentId') else None,
-                # 位置資訊
+                # Location information
                 'longitude': longitude,
                 'latitude': latitude,
             }
@@ -162,21 +162,21 @@ class ThemeParksService:
     @staticmethod
     def sync_destinations():
         """
-        從 ThemeParks API 同步目的地和公園數據到數據庫
+        Synchronize destination and park data from ThemeParks API to database
         
         Returns:
-            tuple: (bool, str) - 同步是否成功，以及成功或錯誤消息
+            tuple: (bool, str) - Whether synchronization was successful, and success or error message
         """
         try:
-            # 獲取 API 數據
+            # Get API data
             response = requests.get(f"{ThemeParksService.BASE_URL}/destinations")
             response.raise_for_status()
             destinations_data = response.json().get('destinations', [])
 
             with transaction.atomic():
-                # 遍歷所有目的地
+                # Iterate through all destinations
                 for dest_data in destinations_data:
-                    # 創建或更新目的地
+                    # Create or update destination
                     destination, created = Destination.objects.update_or_create(
                         id=uuid.UUID(dest_data['id']),
                         defaults={
@@ -185,7 +185,7 @@ class ThemeParksService:
                         }
                     )
 
-                    # 處理該目的地的所有公園
+                    # Process all parks for this destination
                     for park_data in dest_data.get('parks', []):
                         park, created = Park.objects.update_or_create(
                             id=uuid.UUID(park_data['id']),
@@ -195,55 +195,55 @@ class ThemeParksService:
                             }
                         )
 
-            return True, "數據同步成功"
+            return True, "Data synchronized successfully"
         except requests.RequestException as e:
-            return False, f"API 請求錯誤: {str(e)}"
+            return False, f"API request error: {str(e)}"
         except Exception as e:
-            return False, f"同步過程中發生錯誤: {str(e)}"
+            return False, f"Error during synchronization: {str(e)}"
     
     @staticmethod
     def fetch_destinations():
         """
-        從 ThemeParks API 獲取所有目的地信息
+        Get all destination information from ThemeParks API
         
         Returns:
-            list: 目的地列表
+            list: List of destinations
         """
         try:
             response = requests.get(f"{ThemeParksService.BASE_URL}/destinations")
             response.raise_for_status()
             return response.json().get('destinations', [])
         except Exception as e:
-            print(f"獲取目的地時出錯: {e}")
+            print(f"Error fetching destinations: {e}")
             return []
     
     @staticmethod
     def get_all_destinations():
         """
-        從 ThemeParks API 獲取所有目的地信息
+        Get all destination information from ThemeParks API
         
         Returns:
-            list: 目的地列表
+            list: List of destinations
         """
         return ThemeParksService.fetch_destinations()
     
     @staticmethod
     def getEntities():
         """
-        從 ThemeParks API 獲取所有公園信息
+        Get all park information from ThemeParks API
         
         Returns:
-            list: 公園列表
+            list: List of parks
         """
         try:
-            # 獲取所有目的地
+            # Get all destinations
             destinations = ThemeParksService.fetch_destinations()
             
-            # 收集所有公園
+            # Collect all parks
             parks = []
             for dest in destinations:
                 for park in dest.get('parks', []):
-                    # 添加目的地信息到公園數據中
+                    # Add destination information to park data
                     park['destination'] = {
                         'id': dest.get('id'),
                         'name': dest.get('name'),
@@ -253,39 +253,39 @@ class ThemeParksService:
             
             return parks
         except Exception as e:
-            print(f"獲取公園時出錯: {e}")
+            print(f"Error fetching parks: {e}")
             return []
     
     @staticmethod
     def get_all_parks():
         """
-        從 ThemeParks API 獲取所有公園信息（兼容舊的方法名）
+        Get all park information from ThemeParks API (compatible with old method name)
         
         Returns:
-            list: 公園列表
+            list: List of parks
         """
         return ThemeParksService.getEntities()
     
     @staticmethod
     def getEntityById(entity_id):
         """
-        從 ThemeParks API 獲取特定公園信息
+        Get information about a specific park from ThemeParks API
         
         Args:
-            entity_id (str): 公園 ID
+            entity_id (str): Park ID
             
         Returns:
-            dict: 公園信息
+            dict: Park information
         """
         try:
-            # 獲取所有目的地
+            # Get all destinations
             destinations = ThemeParksService.fetch_destinations()
             
-            # 查找特定公園
+            # Find specific park
             for dest in destinations:
                 for park in dest.get('parks', []):
                     if park.get('id') == str(entity_id):
-                        # 添加目的地信息到公園數據中
+                        # Add destination information to park data
                         park['destination'] = {
                             'id': dest.get('id'),
                             'name': dest.get('name'),
@@ -295,85 +295,85 @@ class ThemeParksService:
             
             return None
         except Exception as e:
-            print(f"獲取公園時出錯: {e}")
+            print(f"Error fetching park: {e}")
             return None
     
     @staticmethod
     def get_park_by_id(park_id):
         """
-        從 ThemeParks API 獲取特定公園信息（兼容舊的方法名）
+        Get information about a specific park from ThemeParks API (compatible with old method name)
         
         Args:
-            park_id (str): 公園 ID
+            park_id (str): Park ID
             
         Returns:
-            dict: 公園信息
+            dict: Park information
         """
         return ThemeParksService.getEntityById(park_id)
     
     @staticmethod
     def getDestinationById(destination_id):
         """
-        從 ThemeParks API 獲取特定目的地信息
+        Get information about a specific destination from ThemeParks API
         
         Args:
-            destination_id (str): 目的地 ID
+            destination_id (str): Destination ID
             
         Returns:
-            dict: 目的地信息
+            dict: Destination information
         """
         try:
-            # 獲取所有目的地
+            # Get all destinations
             destinations = ThemeParksService.fetch_destinations()
             
-            # 查找特定目的地
+            # Find specific destination
             for dest in destinations:
                 if dest.get('id') == str(destination_id):
                     return dest
             
             return None
         except Exception as e:
-            print(f"獲取目的地時出錯: {e}")
+            print(f"Error fetching destination: {e}")
             return None
     
     @staticmethod
     def get_destination_by_id(destination_id):
         """
-        從 ThemeParks API 獲取特定目的地信息（兼容舊的方法名）
+        Get information about a specific destination from ThemeParks API (compatible with old method name)
         
         Args:
-            destination_id (str): 目的地 ID
+            destination_id (str): Destination ID
             
         Returns:
-            dict: 目的地信息
+            dict: Destination information
         """
         return ThemeParksService.getDestinationById(destination_id)
     
     @staticmethod
     def findEntities(filter_obj=None):
         """
-        從 ThemeParks API 獲取符合條件的公園
+        Get parks from ThemeParks API that match the conditions
         
         Args:
-            filter_obj (dict, optional): 過濾條件
+            filter_obj (dict, optional): Filter conditions
             
         Returns:
-            list: 符合條件的公園列表
+            list: List of parks matching conditions
         """
         try:
-            # 獲取所有公園
+            # Get all parks
             parks = ThemeParksService.getEntities()
             
-            # 如果沒有過濾條件，則返回所有公園
+            # If no filter conditions, return all parks
             if not filter_obj:
                 return parks
             
-            # 應用過濾條件
+            # Apply filter conditions
             filtered_parks = []
             for park in parks:
                 match = True
                 for key, value in filter_obj.items():
-                    # 處理嵌套屬性，例如 'destination.id'
+                    # Handle nested attributes, e.g. 'destination.id'
                     if '.' in key:
                         parts = key.split('.')
                         park_value = park
@@ -386,7 +386,7 @@ class ThemeParksService:
                     else:
                         park_value = park.get(key)
                     
-                    # 檢查值是否匹配
+                    # Check if value matches
                     if park_value is None or str(park_value) != str(value):
                         match = False
                         break
@@ -396,49 +396,49 @@ class ThemeParksService:
             
             return filtered_parks
         except Exception as e:
-            print(f"查找公園時出錯: {e}")
+            print(f"Error finding parks: {e}")
             return []
     
     @staticmethod
     def get_parks_by_destination(destination_id):
         """
-        從 ThemeParks API 獲取特定目的地的所有公園（兼容舊的方法名）
+        Get all parks for a specific destination from ThemeParks API (compatible with old method name)
         
         Args:
-            destination_id (str): 目的地 ID
+            destination_id (str): Destination ID
             
         Returns:
-            list: 公園列表
+            list: List of parks
         """
         return ThemeParksService.findEntities({'destination.id': destination_id})
         
     @staticmethod
     def getAttractions():
         """
-        從 ThemeParks API 獲取所有吸引設施信息
+        Get all attraction information from ThemeParks API
         
         Returns:
-            list: 吸引設施列表
+            list: List of attractions
         """
         try:
-            # 獲取所有公園
+            # Get all parks
             parks = ThemeParksService.getEntities()
             
-            # 獲取每個公園的吸引設施
+            # Get attractions for each park
             attractions = []
             for park in parks:
                 park_id = park.get('id')
                 
-                # 嘗試獲取此公園的吸引設施
+                # Try to get attractions for this park
                 try:
                     response = requests.get(f"{ThemeParksService.BASE_URL}/entity/{park_id}/children")
                     response.raise_for_status()
                     
-                    # 過濾出類型為 ATTRACTION 的實體
+                    # Filter entities of type ATTRACTION
                     children = response.json().get('children', [])
                     for attraction in children:
                         if attraction.get('entityType') == 'ATTRACTION':
-                            # 添加公園和目的地信息到吸引設施數據中
+                            # Add park and destination information to attraction data
                             attraction['park'] = {
                                 'id': park.get('id'),
                                 'name': park.get('name')
@@ -446,52 +446,52 @@ class ThemeParksService:
                             attraction['destination'] = park.get('destination')
                             attractions.append(attraction)
                 except Exception as e:
-                    print(f"獲取公園 ID {park_id} 的吸引設施時出錯: {e}")
+                    print(f"Error fetching attractions for park ID {park_id}: {e}")
                     continue
                     
             return attractions
         except Exception as e:
-            print(f"獲取吸引設施時出錯: {e}")
+            print(f"Error fetching attractions: {e}")
             return []
             
     @staticmethod
     def getAttractionById(attraction_id):
         """
-        從 ThemeParks API 獲取特定吸引設施信息
+        Get information about a specific attraction from ThemeParks API
         
         Args:
-            attraction_id (str): 吸引設施 ID
+            attraction_id (str): Attraction ID
             
         Returns:
-            dict: 吸引設施信息
+            dict: Attraction information
         """
         try:
-            # 直接獲取實體信息
+            # Directly get entity information
             response = requests.get(f"{ThemeParksService.BASE_URL}/entity/{attraction_id}")
             
             if response.status_code == 200:
                 entity_data = response.json()
                 
-                # 檢查是否為吸引設施類型
+                # Check if it's an attraction type
                 if entity_data.get('entityType') == 'ATTRACTION':
-                    # 尋找此吸引設施所屬的公園
+                    # Find the park this attraction belongs to
                     try:
                         parent_id = entity_data.get('parentId')
                         parent_data = ThemeParksService.getEntityById(parent_id)
                         
                         if parent_data:
-                            # 添加公園和目的地信息
+                            # Add park and destination information
                             entity_data['park'] = {
                                 'id': parent_data.get('id'),
                                 'name': parent_data.get('name')
                             }
                             entity_data['destination'] = parent_data.get('destination')
                     except Exception as e:
-                        print(f"獲取吸引設施父實體時出錯: {e}")
+                        print(f"Error fetching attraction's parent entity: {e}")
                     
                     return entity_data
             
-            # 如果直接請求失敗，嘗試在所有吸引設施中查找
+            # If direct request fails, try to find in all attractions
             attractions = ThemeParksService.getAttractions()
             for attraction in attractions:
                 if attraction.get('id') == str(attraction_id):
@@ -499,19 +499,19 @@ class ThemeParksService:
                     
             return None
         except Exception as e:
-            print(f"獲取吸引設施時出錯: {e}")
+            print(f"Error fetching attraction: {e}")
             return None
             
     @staticmethod
     def get_attractions_by_park(park_id):
         """
-        從 ThemeParks API 獲取特定公園的所有吸引設施
+        Get all attractions for a specific park from ThemeParks API
         
         Args:
-            park_id (str): 公園 ID
+            park_id (str): Park ID
             
         Returns:
-            list: 吸引設施列表
+            list: List of attractions
         """
         try:
             response = requests.get(f"{ThemeParksService.BASE_URL}/entity/{park_id}/children")
@@ -519,13 +519,13 @@ class ThemeParksService:
             if response.status_code == 200:
                 children = response.json().get('children', [])
                 
-                # 過濾出類型為 ATTRACTION 的實體
+                # Filter entities of type ATTRACTION
                 attractions = []
                 park_data = ThemeParksService.getEntityById(park_id)
                 
                 for attraction in children:
                     if attraction.get('entityType') == 'ATTRACTION':
-                        # 添加公園和目的地信息
+                        # Add park and destination information
                         if park_data:
                             attraction['park'] = {
                                 'id': park_data.get('id'),
@@ -538,5 +538,5 @@ class ThemeParksService:
             
             return []
         except Exception as e:
-            print(f"獲取公園吸引設施時出錯: {e}")
+            print(f"Error fetching park attractions: {e}")
             return [] 

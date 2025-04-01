@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 
-app_name = 'web'
+app_name = 'api'
 
 # 在主URLs中已定義API路由
 # router = DefaultRouter()
