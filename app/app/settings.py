@@ -41,6 +41,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://www.park.stockfunction.cloud',
     'http://localhost',
 ]
+CSRF_COOKIE_DOMAIN = 'park.stockfunction.cloud'
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True
@@ -70,13 +71,13 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "drf_yasg",
-    "corsheaders",
+    # "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # CORS middleware
+    # "corsheaders.middleware.CorsMiddleware",  # CORS middleware
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -204,6 +205,7 @@ SWAGGER_SETTINGS = {
     'DEEP_LINKING': True,
     'DISPLAY_OPERATION_ID': False,
     'PERSIST_AUTH': True,
+    'REFETCH_SCHEMA_ON_LOGOUT': True,
     'SHOW_EXTENSIONS': True,
     'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
     'DEFAULT_PAGINATOR_INSPECTORS': [
@@ -260,3 +262,5 @@ LOGGING = {
         },
     },
 }
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
