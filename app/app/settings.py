@@ -190,37 +190,18 @@ REST_FRAMEWORK = {
 
 # drf-yasg 設置
 SWAGGER_SETTINGS = {
-    'USE_SESSION_AUTH': True,
-    'VALIDATOR_URL': None,
-    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'USE_SESSION_AUTH': False,
     'SECURITY_DEFINITIONS': {
-        'Basic': {'type': 'basic'},
-        'Bearer': {'type': 'apiKey', 'name': 'Authorization', 'in': 'header'},
-        'Token': {'type': 'apiKey', 'name': 'Authorization', 'in': 'header'}
+        'Token': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': '輸入格式: Token <your_token>'
+        },
     },
-    'LOGIN_URL': '/api-auth/login/',
-    'LOGOUT_URL': '/api-auth/logout/',
-    'DEFAULT_MODEL_RENDERING': 'example',
-    'DOC_EXPANSION': 'list',
-    'DEEP_LINKING': True,
-    'DISPLAY_OPERATION_ID': False,
     'PERSIST_AUTH': True,
-    'REFETCH_SCHEMA_ON_LOGOUT': True,
-    'SHOW_EXTENSIONS': True,
-    'DEFAULT_GENERATOR_CLASS': 'drf_yasg.generators.OpenAPISchemaGenerator',
-    'DEFAULT_PAGINATOR_INSPECTORS': [
-        'drf_yasg.inspectors.CoreAPICompatInspector',
-    ],
-    'OPERATIONS_SORTER': 'alpha',
-    'FETCH_SCHEMA_WITH_QUERY': True,
-    'DEFAULT_INFO': 'app.urls.swagger_info',
-    'SUPPORTED_SUBMIT_METHODS': [
-        'get',
-        'post',
-        'put',
-        'delete',
-        'patch',
-    ],
+    'REFETCH_SCHEMA_WITH_AUTH': True,
+    'VALIDATOR_URL': None,
 }
 
 AUTHENTICATION_BACKENDS = [
