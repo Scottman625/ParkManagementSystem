@@ -39,11 +39,11 @@ router.register(r'cart', CartViewSet, basename='cart')
 
 # Swagger info definition
 swagger_info = openapi.Info(
-    title="Theme Park Management System API",
+    title="Venue Management System API",
     default_version='v1',
-    description="API documentation for the Theme Park Management System, including all module endpoints",
-    terms_of_service="https://www.google.com/policies/terms/",
-    contact=openapi.Contact(email="contact@example.com"),
+    description="Theme park ticket and order management API",
+    terms_of_service="https://www.yourapp.com/terms/",
+    contact=openapi.Contact(email="contact@yourapp.com"),
     license=openapi.License(name="BSD License"),
 )
 
@@ -52,6 +52,7 @@ schema_view = get_schema_view(
     swagger_info,
     public=True,
     permission_classes=[permissions.AllowAny],
+    url='https://park.stockfunction.cloud',
     patterns=[
         path('api/', include(router.urls)),
         path('api/user/', include('user.urls')),
@@ -70,8 +71,8 @@ urlpatterns = [
     path('api/auth/token/', CreateTokenView.as_view(), name='api_token_auth'),
     
     # Swagger URLs
-    re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('api-auth/', include('rest_framework.urls')),
 ]
